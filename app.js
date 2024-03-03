@@ -1,4 +1,5 @@
 // app.js
+require('dotenv').config();
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -9,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 8001;
 
 // Connect to MongoDB
-connectDB("mongodb://127.0.0.1:27017/country_db");
+connectDB(process.env.MONGO_URL);
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());

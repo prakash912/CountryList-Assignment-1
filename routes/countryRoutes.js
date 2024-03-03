@@ -6,8 +6,8 @@ router.route("/")
 .get(countryController.getAllCountriesPaginated)
 .post(countryController.addCountry);
 router.get('/:id', countryController.getCountryDetail);
-router.get('/:id/neighbour', countryController.getCountryNeighbors);
-router.post('/:countryId/neighbors', countryController.addNeighbor);
+router.get('/:countryId/neighbour', countryController.getCountryNeighbors);
+router.post('/:countryId/neighbors', countryController.addNeighbors);
 router.get('/sorted', countryController.getCountriesSorted);
 
 

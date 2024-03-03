@@ -1,4 +1,6 @@
-const Country = require('../models/Country');
+const { Country, Neighbor } = require('../models/Country');
+
+
 const mongoose = require('mongoose');
 
 
@@ -54,83 +56,139 @@ exports.addCountry = async (req, res) => {
 
   exports.getCountryNeighbors = async (req, res) => {
     try {
-      const country = await Country.findById(req.params.id).populate('neighbors');
-      if (!country) {
-        res.status(404).json({ message: 'Country not found', data: {} });
-        return;
-      }
-  
-      // Extract neighbor details
-      const neighborDetails = country.neighbors.map(neighbor => ({
-        id: neighbor.id,
-        name: neighbor.name,
-        cca3: neighbor.cca3,
-        currency_code: neighbor.currency_code,
-        currency: neighbor.currency,
-        capital: neighbor.capital,
-        region: neighbor.region,
-        subregion: neighbor.subregion,
-        area: neighbor.area,
-        map_url: neighbor.map_url,
-        population: neighbor.population,
-        flag_url: neighbor.flag_url
-      }));
-  
-      res.status(200).json({
-        message: 'Country neighbours',
-        data: { countries: neighborDetails }
-      });
-    } catch (error) {
-      res.status(500).json({ message: 'Internal Server Error', data: {} });
-    }
-  };
-  
+        const { countryId } = req.params;
+        console.log('Requested country ID:', countryId);
 
-  exports.addNeighbor = async (req, res) => {
-    const { countryId } = req.params;
-    const neighborData = req.body;
-
-    try {
         // Find the country by ID
         const country = await Country.findById(countryId);
+        console.log('Retrieved country:', country);
+
         if (!country) {
+            console.log('Country not found');
             return res.status(404).json({ message: 'Country not found', data: {} });
         }
 
-        // Loop through neighbor data and add neighbors to the country
-        for (const neighbor of neighborData) {
-            // Create a new neighbor country object based on the provided data
-            const newNeighbor = new Country({
-                name: neighbor.name,
-                cca3: neighbor.cca3,
-                currency_code: neighbor.currency_code,
-                currency: neighbor.currency,
-                capital: neighbor.capital,
-                region: neighbor.region,
-                subregion: neighbor.subregion,
-                area: neighbor.area,
-                map_url: neighbor.map_url,
-                population: neighbor.population,
-                flag_url: neighbor.flag_url
-            });
-            // Save the new neighbor country to the database
-            await newNeighbor.save();
-            // Add the newly created neighbor country's ID to the country's neighbors array
-            country.neighbors.push(newNeighbor._id);
+        // Find neighbors of the country
+        const neighbors = await Neighbor.find({ countryId }).populate('neighborId');
+        if (!neighbors || neighbors.length === 0) {
+            console.log('No neighbors found');
+            return res.status(200).json({ message: 'Country neighbors', data: { list: [] } });
         }
 
-        // Save the updated country with new neighbors
-        await country.save();
-
-        // Fetch updated country data after saving
-        const updatedCountry = await Country.findById(countryId).populate('neighbors');
-
-        return res.status(200).json({ message: 'Neighbors added successfully', data: { country: updatedCountry } });
+        console.log('Neighbors found:', neighbors);
+        return res.status(200).json({ message: 'Country neighbors', data: { list: neighbors.map(neighbor => neighbor.neighborId) } });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ message: 'Internal Server Error', data: {} });
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 };
+
+
+// Add Neighbors API
+// exports.addNeighbors = async (req, res) => {
+//   try {
+//       const { countryId } = req.params;
+//       let neighborData = req.body;
+
+//       // Remove countryId from neighborData if present
+//       neighborData = neighborData.filter(id => id !== countryId);
+
+//       // Find the country by ID
+//       const country = await Country.findById(countryId);
+//       if (!country) {
+//           return res.status(404).json({ message: 'Country not found', data: {} });
+//       }
+
+//       // Get existing country IDs
+//       const existingCountryIds = (await Country.find({}, '_id')).map(country => country._id.toString());
+
+//       const errors = [];
+//       const successfulAdditions = [];
+
+//       for (const neighborId of neighborData) {
+//           // Check if the neighbor ID exists and is not the same as the country ID
+//           if (!existingCountryIds.includes(neighborId)) {
+//               errors.push(`Invalid neighbor country ID: ${neighborId}`);
+//               continue;
+//           }
+
+//           // Check if the neighbor already exists for the country
+//           const existingNeighbor = await Neighbor.findOne({ countries: { $all: [countryId, neighborId] } });
+//           if (existingNeighbor) {
+//               errors.push(`Neighbor with ID ${neighborId} already exists for this country`);
+//               continue;
+//           }
+
+//           // Add neighbor
+//           const neighbor = new Neighbor({ countries: [countryId, neighborId] });
+//           await neighbor.save();
+//           successfulAdditions.push(neighbor);
+//       }
+
+//       if (successfulAdditions.length === 0) {
+//           return res.status(400).json({ message: 'Failed to add neighbors', data: { neighbors: [], errors } });
+//       }
+
+//       return res.status(200).json({ message: 'Neighbors added successfully', data: { neighbors: successfulAdditions }, errors });
+//   } catch (error) {
+//       console.error(error);
+//       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+//   }
+// };
+
+exports.addNeighbors = async (req, res) => {
+  try {
+      const { countryId } = req.params;
+      let neighborData = req.body;
+
+      // Remove countryId from neighborData if present
+      neighborData = neighborData.filter(id => id !== countryId);
+
+      // Find the country by ID
+      const country = await Country.findById(countryId);
+      if (!country) {
+          return res.status(404).json({ message: 'Country not found', data: {} });
+      }
+
+      // Get existing country IDs
+      const existingCountryIds = (await Country.find({}, '_id')).map(country => country._id.toString());
+
+      const errors = [];
+      const successfulAdditions = [];
+
+      for (const neighborId of neighborData) {
+          // Check if the neighbor ID exists and is not the same as the country ID
+          if (!existingCountryIds.includes(neighborId)) {
+              errors.push(`Invalid neighbor country ID: ${neighborId}`);
+              continue;
+          }
+
+          // Check if the neighbor already exists for the country
+          const existingNeighbor = await Neighbor.findOne({ countryId, neighborId });
+          if (existingNeighbor) {
+              errors.push(`Neighbor with ID ${neighborId} already exists for this country`);
+              continue;
+          }
+
+          // Add neighbor
+          const neighbor = new Neighbor({ countryId, neighborId });
+          await neighbor.save();
+          successfulAdditions.push(neighbor);
+      }
+
+      if (successfulAdditions.length === 0) {
+          return res.status(400).json({ message: 'Failed to add neighbors', data: { neighbors: [], errors } });
+      }
+
+      return res.status(200).json({ message: 'Neighbors added successfully', data: { neighbors: successfulAdditions }, errors });
+  } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+
+
 
 exports.getCountriesSorted = async (req, res) => {
     try {
